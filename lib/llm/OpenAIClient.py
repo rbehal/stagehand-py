@@ -1,27 +1,24 @@
+import os
 import json
 import base64
-from typing import Dict, Any, Callable
+import logging
+from typing import Dict, Any, Optional
+
 from openai import OpenAI
-from pydantic import BaseModel
+
+from utils.logger import get_default_logger
+from utils.utils import get_json_response_format
+
 from .LLMClient import LLMClient, ChatCompletionOptions, ExtractionOptions
 
-def get_json_response_format(schema: BaseModel, name: str) -> Dict[str, Any]:
-    return {
-        "type": "json_object",
-        "schema": schema.model_json_schema()
-    }
 
 class OpenAIClient(LLMClient):
-    def __init__(self, logger: Callable[[Dict[str, str]], None]):
-        self.client = OpenAI()
-        self.logger = logger
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        self.logger = logger if logger else get_default_logger("OpenAIClient")
 
-    async def create_chat_completion(self, options: ChatCompletionOptions) -> Dict[str, Any]:
-        self.logger({
-            "category": "OpenAI",
-            "message": f"Creating chat completion with options: {json.dumps(options.dict())}",
-            "level": 1
-        })
+    def create_chat_completion(self, options: ChatCompletionOptions) -> Dict[str, Any]:
+        self.logger.info(f"Creating chat completion with options: {json.dumps(options.dict())}")
 
         if options.image:
             screenshot_message = {
@@ -39,7 +36,7 @@ class OpenAIClient(LLMClient):
                 screenshot_message["content"].append({"type": "text", "text": options.image.description})
             options.messages.append(screenshot_message)
 
-        openai_options = options.dict(exclude={"image", "response_model"})
+        openai_options = options.model_dump(exclude={"image", "response_model"})
 
         response_format = None
         if options.response_model:
@@ -48,54 +45,38 @@ class OpenAIClient(LLMClient):
                 options.response_model.name
             )
 
-        response = await self.client.chat.completions.create(
+        response = self.client.chat.completions.create(
             **openai_options,
             response_format=response_format
         )
 
-        self.logger({
-            "category": "OpenAI",
-            "message": f"Response from OpenAI: {json.dumps(response)}",
-            "level": 2
-        })
+        self.logger.debug(f"Response from OpenAI: {response.model_dump_json()}")
 
         if options.response_model:
             extracted_data = response.choices[0].message.content
-            self.logger({
-                "category": "OpenAI",
-                "message": f"Extracted data: {extracted_data}",
-                "level": 2
-            })
+            self.logger.debug(f"Extracted data: {extracted_data}")
 
             parsed_data = json.loads(extracted_data)
             return parsed_data
 
         return response
 
-    async def create_extraction(self, options: ExtractionOptions) -> Dict[str, Any]:
-        self.logger({
-            "category": "OpenAI",
-            "message": f"Creating extraction with options: {json.dumps(options.dict())}",
-            "level": 1
-        })
+    def create_extraction(self, options: ExtractionOptions) -> Dict[str, Any]:
+        self.logger.info(f"Creating extraction with options: {json.dumps(options.dict())}")
 
         response_format = get_json_response_format(
             options.response_model.schema,
             options.response_model.name
         )
 
-        completion = await self.client.chat.completions.create(
+        completion = self.client.chat.completions.create(
             model=options.model,
             messages=[msg.dict() for msg in options.messages],
             response_format=response_format
         )
 
         extracted_data = completion.choices[0].message.content
-        self.logger({
-            "category": "OpenAI",
-            "message": f"Extracted data: {extracted_data}",
-            "level": 2
-        })
+        self.logger.debug(f"Extracted data: {extracted_data}")
 
         parsed_data = json.loads(extracted_data)
         return parsed_data

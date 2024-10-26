@@ -36,6 +36,31 @@ class Image(BaseModel):
     buffer: bytes
     description: Optional[str] = None
 
+class ToolType(str, Enum):
+    FUNCTION = "function"
+
+class FunctionParameters(BaseModel):
+    properties: Dict[str, Any]
+    required: List[str]
+
+class Function(BaseModel):
+    name: str
+    description: str
+    parameters: FunctionParameters
+
+class Tool(BaseModel):
+    type: ToolType
+    function: Optional[Function] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+    @classmethod
+    def function_tool(cls, name: str, description: str, parameters: FunctionParameters) -> 'Tool':
+        return cls(
+            type=ToolType.FUNCTION,
+            function=Function(name=name, description=description, parameters=parameters)
+        )
+
 class ResponseModel(BaseModel):
     name: str
     schema: Any
@@ -43,13 +68,14 @@ class ResponseModel(BaseModel):
 class ChatCompletionOptions(BaseModel):
     model: str
     messages: List[ChatMessage]
+    max_tokens: Optional[int] = None
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     frequency_penalty: Optional[float] = None
     presence_penalty: Optional[float] = None
     image: Optional[Image] = None
+    tools: Optional[List[Tool]] = None
     response_model: Optional[ResponseModel] = None
-    additional_options: Dict[str, Any] = Field(default_factory=dict)
 
 class ExtractionOptions(ChatCompletionOptions):
     response_model: ResponseModel

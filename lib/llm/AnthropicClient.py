@@ -1,23 +1,28 @@
 import os
-from typing import Dict, Any, Callable
 import json
 import base64
-from anthropic import Anthropic
+import logging
+from datetime import datetime
+from typing import Dict, Any, Optional
+
+from anthropic import Anthropic, NotGiven
+from anthropic.types import TextBlock
+
+from utils.logger import get_default_logger
+
 from .LLMClient import LLMClient, ChatCompletionOptions, ExtractionOptions
 
-class AnthropicClient(LLMClient):
-    def __init__(self, logger: Callable[[Dict[str, str]], None]):
-        self.client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-        self.logger = logger
 
-    async def create_chat_completion(self, options: ChatCompletionOptions) -> Dict[str, Any]:
+class AnthropicClient(LLMClient):
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        self.client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        self.logger = logger if logger else get_default_logger("AnthropicClient")
+
+    def create_chat_completion(self, options: ChatCompletionOptions) -> Dict[str, Any]:
         system_message = next((msg for msg in options.messages if msg.role == "system"), None)
         user_messages = [msg for msg in options.messages if msg.role != "system"]
         
-        self.logger({
-            "category": "Anthropic",
-            "message": f"Creating chat completion with options: {json.dumps(options.dict())}"
-        })
+        self.logger.info(f"Creating chat completion with options: {json.dumps(options.dict())}")
 
         if options.image:
             screenshot_message = {
@@ -68,26 +73,26 @@ class AnthropicClient(LLMClient):
             }
             anthropic_tools.append(tool_definition)
 
-        response = await self.client.messages.create(
+        response = self.client.messages.create(
             model=options.model,
             max_tokens=options.max_tokens or 1500,
             messages=[{"role": msg.role, "content": msg.content} for msg in user_messages],
-            tools=anthropic_tools,
-            system=system_message.content if system_message else None,
-            temperature=options.temperature
+            tools=anthropic_tools if anthropic_tools else NotGiven(),
+            system=system_message.content if system_message else NotGiven(),
+            temperature=options.temperature if options.temperature is not None else NotGiven()
         )
 
         transformed_response = {
             "id": response.id,
             "object": "chat.completion",
-            "created": int(response.created_at.timestamp()),
+            "created": int(datetime.now().timestamp()),  # Use current timestamp instead
             "model": response.model,
             "choices": [
                 {
                     "index": 0,
                     "message": {
                         "role": "assistant",
-                        "content": next((c.text for c in response.content if c.type == "text"), None),
+                        "content": next((c.text for c in response.content if isinstance(c, TextBlock)), None),
                         "tool_calls": [
                             {
                                 "id": c.id,
@@ -96,7 +101,7 @@ class AnthropicClient(LLMClient):
                                     "name": c.name,
                                     "arguments": json.dumps(c.input)
                                 }
-                            } for c in response.content if c.type == "tool_use"
+                            } for c in response.content if hasattr(c, 'type') and c.type == "tool_calls"
                         ]
                     },
                     "finish_reason": response.stop_reason
@@ -109,10 +114,7 @@ class AnthropicClient(LLMClient):
             }
         }
 
-        self.logger({
-            "category": "Anthropic",
-            "message": f"Transformed response: {json.dumps(transformed_response)}"
-        })
+        self.logger.debug(f"Transformed response: {json.dumps(transformed_response)}")
 
         if options.response_model:
             tool_use = next((c for c in response.content if c.type == "tool_use"), None)
@@ -123,12 +125,8 @@ class AnthropicClient(LLMClient):
 
         return transformed_response
 
-    async def create_extraction(self, options: ExtractionOptions) -> Dict[str, Any]:
-        self.logger({
-            "category": "Anthropic",
-            "message": f"Creating extraction with options: {json.dumps(options.dict())}",
-            "level": 2
-        })
+    def create_extraction(self, options: ExtractionOptions) -> Dict[str, Any]:
+        self.logger.info(f"Creating extraction with options: {json.dumps(options.dict())}")
 
         json_schema = options.response_model.schema.schema()
         schema_properties = json_schema.get("properties", {})
@@ -147,7 +145,7 @@ class AnthropicClient(LLMClient):
         system_message = next((msg for msg in options.messages if msg.role == "system"), None)
         user_messages = [msg for msg in options.messages if msg.role != "system"]
 
-        response = await self.client.messages.create(
+        response = self.client.messages.create(
             model=options.model or "claude-3-opus-20240229",
             max_tokens=options.max_tokens or 1000,
             messages=[{"role": msg.role, "content": msg.content} for msg in user_messages],
@@ -156,20 +154,12 @@ class AnthropicClient(LLMClient):
             tools=[tool_definition]
         )
 
-        self.logger({
-            "category": "Anthropic",
-            "message": f"Response from Anthropic: {json.dumps(response.dict())}",
-            "level": 2
-        })
+        self.logger.debug(f"Response from Anthropic: {json.dumps(response.dict())}")
 
         tool_use = next((c for c in response.content if c.type == "tool_use"), None)
         if tool_use and hasattr(tool_use, 'input'):
             extracted_data = tool_use.input
-            self.logger({
-                "category": "Anthropic",
-                "message": f"Extracted data: {json.dumps(extracted_data)}",
-                "level": 2
-            })
+            self.logger.debug(f"Extracted data: {json.dumps(extracted_data)}")
             return extracted_data
         else:
             raise ValueError("Extraction failed: No tool use with input in response")
