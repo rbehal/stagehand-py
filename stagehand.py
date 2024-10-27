@@ -113,6 +113,16 @@ class Stagehand:
                 # Handle page navigation errors silently
                 pass
 
+    def _inject_scripts(self) -> None:
+        """Inject required JavaScript files into the browser."""
+        script_dir = Path(__file__).parent / "lib" / "scripts"
+        for script in ["process.js", "utils.js", "debug.js"]:
+            script_path = script_dir / script
+            self.logger.info(f"Injecting script: {script_path}")
+            with open(script_path, encoding='utf-8') as f:
+                script_content = f.read()
+                self.driver.execute_script(script_content)
+
     def _init(self, model_name: str = "gpt-4o") -> Dict[str, Optional[str]]:
         """Initialize the Stagehand instance."""
         browser_info = get_browser(self.env, self.headless, self.logger)
@@ -124,10 +134,7 @@ class Stagehand:
             self.driver.set_window_size(1280, 720)
 
         # Initialize custom scripts
-        script_dir = Path(__file__).parent / "lib" / "scripts"
-        for script in ["process.js", "utils.js", "debug.js"]:
-            with open(script_dir / script) as f:
-                self.driver.execute_script(f.read())
+        self._inject_scripts()
 
         return {
             "debug_url": browser_info.get("debug_url"),
@@ -145,16 +152,8 @@ class Stagehand:
         try:
             self.driver.get(url)
             self.wait_for_settled_dom()
-            
             # We have to reinject scripts after navigation as the javascript context reloads in Selenium
-            script_dir = Path(__file__).parent / "lib" / "scripts"
-            for script in ["process.js", "utils.js", "debug.js"]:
-                script_path = script_dir / script
-                self.logger.info(f"Reinjecting script: {script_path}")
-                
-                with open(script_path, encoding='utf-8') as f:
-                    script_content = f.read()
-                    self.driver.execute_script(script_content)
+            self._inject_scripts()
         except Exception as e:
             self.logger.error(f"Error navigating to {url}: {str(e)}\nTrace: {traceback.format_exc()}")
             raise    
@@ -388,7 +387,7 @@ class Stagehand:
 
         # Action found, proceed to execute
         element_id = response["element"]
-        xpath = selector_map[element_id]
+        xpath = selector_map[str(element_id)]
         method = response["method"]
         args = response["args"]
 
@@ -452,6 +451,8 @@ class Stagehand:
                     self.driver.switch_to.window(handles[0])
                     self.driver.get(new_url)
                     self.wait_for_settled_dom()
+                    # Re-inject scripts after navigation, as JS context resets
+                    self._inject_scripts()
 
                 # Wait for network idle
                 try:
@@ -477,6 +478,8 @@ class Stagehand:
                         "message": f"New page detected with URL: {self.driver.current_url}",
                         "level": 1
                     })
+                    # Re-inject scripts after navigation, as JS context resets
+                    self._inject_scripts()
 
             else:
                 self.log({
@@ -750,7 +753,7 @@ class Stagehand:
             "level": 1
         })
 
-        selector = selector_map[int(element_id)]
+        selector = selector_map[str(element_id)]
         locator_string = f"xpath={selector}"
 
         self.log({

@@ -1,5 +1,6 @@
-from typing import Optional, Any, Dict
+import json
 from pydantic import BaseModel
+from typing import Optional, Any, Dict
 
 from .prompt import (
     act_tools,
@@ -102,7 +103,10 @@ def act(
     if tool_calls and len(tool_calls) > 0:
         if tool_calls[0].function.name == "skipSection":
             return None
-        return tool_calls[0].function.arguments
+        
+        arguments = tool_calls[0].function.arguments
+        if arguments:
+            return json.loads(arguments)
     else:
         if retries >= 2:
             logger.error("No tool calls found in response")
