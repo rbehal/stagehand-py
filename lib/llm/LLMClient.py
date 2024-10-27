@@ -23,7 +23,7 @@ class ChatMessage(BaseModel):
     role: MessageRole
     content: Union[str, List[ContentItem]]
 
-models_with_vision = [
+MODELS_WITH_VISION = [
     "gpt-4o",
     "gpt-4o-mini",
     "claude-3-5-sonnet-20240620",

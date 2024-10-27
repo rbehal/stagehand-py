@@ -12,7 +12,7 @@ def run_wikipedia_eval():
     stagehand.init()
     
     try:
-        stagehand.page.goto("https://en.wikipedia.org/wiki/Baseball")
+        stagehand.driver.get("https://en.wikipedia.org/wiki/Baseball")
         
         stagehand.act("click the 'hit and run' link in this article")
 
@@ -27,4 +27,4 @@ def run_wikipedia_eval():
         print(f"Error in wikipedia eval: {str(e)}")
         return False
     finally:
-        stagehand.page.close()
+        stagehand.driver.quit()

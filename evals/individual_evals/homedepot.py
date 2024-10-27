@@ -31,4 +31,4 @@ def run_homedepot_eval():
         print(f"Error in Home Depot eval: {str(e)}")
         return False
     finally:
-        stagehand.page.close()
+        stagehand.driver.quit()

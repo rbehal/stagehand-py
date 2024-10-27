@@ -18,6 +18,7 @@ from utils.logger import get_default_logger
 
 from lib.vision import ScreenshotService
 from lib.llm.LLMProvider import LLMProvider
+from lib.llm.LLMClient import MODELS_WITH_VISION
 from lib.inference import act, verify_act_completion
 
 load_dotenv()
@@ -201,7 +202,7 @@ class Stagehand:
         """Internal method to perform an action."""
         model = model_name or self.default_model_name
 
-        if not self.models_with_vision.includes(model) and (use_vision is not False or verifier_use_vision):
+        if not MODELS_WITH_VISION.includes(model) and (use_vision is not False or verifier_use_vision):
             self.log({
                 "category": "action",
                 "message": f"{model} does not support vision, but use_vision was set to {use_vision}. Defaulting to false.",
@@ -244,7 +245,7 @@ class Stagehand:
         # Handle vision if enabled
         annotated_screenshot = None
         if use_vision is True:
-            if not self.models_with_vision.includes(model):
+            if not MODELS_WITH_VISION.includes(model):
                 self.log({
                     "category": "action",
                     "message": f"{model} does not support vision. Skipping vision processing.",

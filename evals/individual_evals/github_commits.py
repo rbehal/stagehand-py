@@ -12,7 +12,7 @@ def run_github_commits_eval():
     stagehand.init()
     
     try:
-        stagehand.page.goto("https://github.com/facebook/react")
+        stagehand.driver.get("https://github.com/facebook/react")
 
         stagehand.act("find commit history, generally described by the number of commits")
         
@@ -30,4 +30,4 @@ def run_github_commits_eval():
         print(f"Error in github commits eval: {str(e)}")
         return False
     finally:
-        stagehand.page.close()
+        stagehand.driver.quit()

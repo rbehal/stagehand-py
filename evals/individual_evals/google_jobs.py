@@ -41,4 +41,4 @@ def run_google_jobs_eval():
         print(f"Error in google jobs eval: {str(e)}")
         return False
     finally:
-        stagehand.page.close()
+        stagehand.driver.quit()
