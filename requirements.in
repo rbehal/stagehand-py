@@ -1,5 +1,6 @@
 anthropic
 openai
+pillow
 pydantic
 python-dotenv
 selenium
