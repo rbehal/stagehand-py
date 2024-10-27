@@ -50,7 +50,7 @@ class Stagehand:
         self.actions: Dict[str, Dict[str, str]] = {}
         self.verbose = verbose
         self.debug_dom = debug_dom
-        self.default_model_name = "gpt-4"
+        self.default_model_name = "gpt-4o"
         self.headless = headless
         self.driver: Optional[WebDriver] = None
         self.pending_logs: List[Dict[str, Any]] = []
@@ -113,7 +113,7 @@ class Stagehand:
                 # Handle page navigation errors silently
                 pass
 
-    def _init(self, model_name: str = "gpt-4") -> Dict[str, Optional[str]]:
+    def _init(self, model_name: str = "gpt-4o") -> Dict[str, Optional[str]]:
         """Initialize the Stagehand instance."""
         browser_info = get_browser(self.env, self.headless, self.logger)
         self.driver = browser_info["driver"]
@@ -327,15 +327,15 @@ class Stagehand:
                 )
                 annotated_screenshot = screenshot_service.get_annotated_screenshot(False)
 
-        response = act({
-            "action": action,
-            "dom_elements": output_string,
-            "steps": "",
-            "llm_provider": self.llm_provider,
-            "model_name": model,
-            "screenshot": annotated_screenshot,
-            "logger": self.logger
-        })
+        response = act(
+            action, 
+            output_string, 
+            None, 
+            self.llm_provider, 
+            model,
+            screenshot=annotated_screenshot,
+            logger=self.logger
+        )
 
         self.log({
             "category": "action",

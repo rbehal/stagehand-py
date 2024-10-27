@@ -4,7 +4,7 @@ import base64
 import logging
 from typing import Dict, Any, Optional
 
-from openai import OpenAI
+from openai import OpenAI, NOT_GIVEN
 
 from utils.logger import get_default_logger
 from utils.utils import get_json_response_format
@@ -45,9 +45,11 @@ class OpenAIClient(LLMClient):
                 options.response_model.name
             )
 
+        # Replace None values with NOT_GIVEN
+        openai_options = {k: v if v is not None else NOT_GIVEN for k, v in openai_options.items()}
         response = self.client.chat.completions.create(
             **openai_options,
-            response_format=response_format
+            response_format=response_format or NOT_GIVEN
         )
 
         self.logger.debug(f"Response from OpenAI: {response.model_dump_json()}")

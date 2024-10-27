@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+from langchain_core.utils.function_calling import convert_pydantic_to_openai_function
+
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 
 # Models for function parameters
@@ -116,22 +118,16 @@ def build_act_user_prompt(
 
 # Tools configuration
 act_tools: List[ChatCompletionToolParam] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "doAction",
-            "description": "execute the next playwright step that directly accomplishes the goal",
-            "parameters": DoActionParams.model_json_schema()
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "skipSection",
-            "description": "skips this area of the webpage because the current goal cannot be accomplished here",
-            "parameters": SkipSectionParams.model_json_schema()
-        }
-    }
+    convert_pydantic_to_openai_function(
+        DoActionParams, 
+        name='doAction', 
+        description='execute the next playwright step that directly accomplishes the goal'
+    ),
+    convert_pydantic_to_openai_function(
+        DoActionParams, 
+        name='skipSection', 
+        description='skips this area of the webpage because the current goal cannot be accomplished here'
+    ),
 ]
 
 # Extract related prompts and functions

@@ -1,3 +1,4 @@
+import traceback
 from typing import List
 from pydantic import BaseModel
 from stagehand import Stagehand
@@ -24,6 +25,7 @@ def run_wikipedia_eval():
         return True
     except Exception as e:
         print(f"Error in wikipedia eval: {str(e)}")
+        print(f"Stacktrace:\n{traceback.format_exc()}")
         return False
     finally:
         stagehand.driver.quit()

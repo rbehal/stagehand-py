@@ -20,7 +20,7 @@ from .prompt import (
 )
 
 from .llm.LLMProvider import LLMProvider
-from .llm.LLMClient import ANNOTATED_SCREENSHOT_TEXT
+from .llm.LLMClient import ChatCompletionOptions, ANNOTATED_SCREENSHOT_TEXT
 
 from utils.logger import get_default_logger
 
@@ -84,7 +84,7 @@ def act(
         build_act_user_prompt(action, steps, dom_elements)
     ]
 
-    response = llm_client.create_chat_completion(
+    options = ChatCompletionOptions(
         model=model_name,
         messages=messages,
         temperature=0.1,
@@ -95,6 +95,8 @@ def act(
         tools=act_tools,
         image={"buffer": screenshot, "description": ANNOTATED_SCREENSHOT_TEXT} if screenshot else None
     )
+
+    response = llm_client.create_chat_completion(options=options)
 
     tool_calls = response.choices[0].message.tool_calls
     if tool_calls and len(tool_calls) > 0:
