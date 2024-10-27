@@ -42,6 +42,7 @@ class ToolType(str, Enum):
 class FunctionParameters(BaseModel):
     properties: Dict[str, Any]
     required: List[str]
+    type: str = "object"
 
 class Function(BaseModel):
     name: str

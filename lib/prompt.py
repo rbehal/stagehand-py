@@ -3,7 +3,9 @@ from typing import List, Optional
 
 from langchain_core.utils.function_calling import convert_pydantic_to_openai_function
 
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
+from lib.llm.LLMClient import Tool, FunctionParameters
+
+from openai.types.chat import ChatCompletionMessageParam
 
 # Models for function parameters
 class DoActionParams(BaseModel):
@@ -116,17 +118,22 @@ def build_act_user_prompt(
         "content": act_user_prompt
     }
 
-# Tools configuration
-act_tools: List[ChatCompletionToolParam] = [
-    convert_pydantic_to_openai_function(
-        DoActionParams, 
-        name='doAction', 
-        description='execute the next playwright step that directly accomplishes the goal'
+act_tools: List[Tool] = [
+    Tool.function_tool(
+        name='doAction',
+        description='execute the next playwright step that directly accomplishes the goal',
+        parameters=FunctionParameters(
+            properties=convert_pydantic_to_openai_function(DoActionParams)["parameters"]["properties"],
+            required=convert_pydantic_to_openai_function(DoActionParams)["parameters"]["required"]
+        )
     ),
-    convert_pydantic_to_openai_function(
-        DoActionParams, 
+    Tool.function_tool(
         name='skipSection', 
-        description='skips this area of the webpage because the current goal cannot be accomplished here'
+        description='skips this area of the webpage because the current goal cannot be accomplished here',
+        parameters=FunctionParameters(
+            properties=convert_pydantic_to_openai_function(DoActionParams)["parameters"]["properties"],
+            required=convert_pydantic_to_openai_function(DoActionParams)["parameters"]["required"]
+        )
     ),
 ]
 
