@@ -147,13 +147,34 @@ class Stagehand:
         downloads_dir.mkdir(exist_ok=True)
         
         # Click the download link
-        self.act({"action": f"click on {url}"})
+        self.act(f"click on {url}")
         
         # Wait for download to complete
         download_path = downloads_dir / f"{title}.pdf"
         timeout = time.time() + 30
         while not download_path.exists() and time.time() < timeout:
             time.sleep(0.5)
+
+    def start_dom_debug(self) -> None:
+        """Start DOM debugging if enabled."""
+        try:
+            if self.debug_dom:
+                self.driver.execute_script("if (typeof window.debugDom === 'function') { window.debugDom(); } else { console.log('debugDom is not defined'); }")
+        except Exception as e:
+            self.log({
+                "category": "dom",
+                "message": f"Error in start_dom_debug: {str(e)}\nTrace: {traceback.format_exc()}",
+                "level": 1
+            })
+
+    def cleanup_dom_debug(self) -> None:
+        """Cleanup DOM debugging if enabled."""
+        try:
+            if self.debug_dom:
+                self.driver.execute_script("if (typeof window.cleanupDebug === 'function') { window.cleanupDebug(); }")
+        except Exception:
+            # Silently handle cleanup errors
+            pass            
 
     def act(self, 
             action: str,
@@ -516,6 +537,178 @@ class Stagehand:
                 "message": f"Error performing action: {str(error)}",
                 "action": action
             }
+        
+    def _extract(
+        self,
+        instruction: str,
+        schema: Any,
+        progress: str = "",
+        content: Dict = None,
+        chunks_seen: List[int] = None,
+        model_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Internal method to handle extraction across chunks."""
+        content = content or {}
+        chunks_seen = chunks_seen or []
+        
+        self.log({
+            "category": "extraction",
+            "message": f"starting extraction '{instruction}'",
+            "level": 1
+        })
+
+        self.wait_for_settled_dom()
+        self.start_dom_debug()
+        
+        result = self.driver.execute_script(
+            "return window.processDom(arguments[0])",
+            chunks_seen
+        )
+        output_string = result["outputString"]
+        chunk = result["chunk"]
+        chunks = result["chunks"]
+        
+        self.log({
+            "category": "extraction",
+            "message": f"received output from processDom. Current chunk index: {chunk}, Number of chunks left: {len(chunks) - len(chunks_seen)}",
+            "level": 1
+        })
+
+        extraction_response = self.extract({
+            "instruction": instruction,
+            "progress": progress,
+            "previously_extracted_content": content,
+            "dom_elements": output_string,
+            "llm_provider": self.llm_provider,
+            "schema": schema,
+            "model_name": model_name or self.default_model_name,
+            "chunks_seen": len(chunks_seen),
+            "chunks_total": len(chunks)
+        })
+
+        metadata = extraction_response.pop("metadata", {})
+        new_progress = metadata.get("progress", "")
+        completed = metadata.get("completed", False)
+        output = extraction_response
+        
+        self.cleanup_dom_debug()
+
+        self.log({
+            "category": "extraction",
+            "message": f"received extraction response: {json.dumps(extraction_response)}",
+            "level": 1
+        })
+
+        chunks_seen.append(chunk)
+
+        if completed or len(chunks_seen) == len(chunks):
+            self.log({
+                "category": "extraction",
+                "message": f"response: {json.dumps(extraction_response)}",
+                "level": 1
+            })
+            return output
+        else:
+            self.log({
+                "category": "extraction",
+                "message": f"continuing extraction, progress: '{new_progress}'",
+                "level": 1
+            })
+            self.wait_for_settled_dom()
+            return self._extract(
+                instruction=instruction,
+                schema=schema,
+                progress=new_progress,
+                content=output,
+                chunks_seen=chunks_seen,
+                model_name=model_name
+            )
+
+    def extract(
+        self,
+        instruction: str,
+        schema: Any,
+        model_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Extract structured data from the current page."""
+        return self._extract(
+            instruction=instruction,
+            schema=schema,
+            model_name=model_name
+        )
+
+    def observe(
+        self,
+        observation: str,
+        model_name: Optional[str] = None
+    ) -> Optional[str]:
+        """Find an element on the page matching the observation."""
+        self.log({
+            "category": "observation",
+            "message": f"starting observation: {observation}",
+            "level": 1
+        })
+
+        self.wait_for_settled_dom()
+        self.start_dom_debug()
+        
+        result = self.driver.execute_script("return window.processDom([])")
+        output_string = result["outputString"]
+        selector_map = result["selectorMap"]
+
+        element_id = self.observe({
+            "observation": observation,
+            "dom_elements": output_string,
+            "llm_provider": self.llm_provider,
+            "model_name": model_name or self.default_model_name
+        })
+        
+        self.cleanup_dom_debug()
+
+        if element_id == "NONE":
+            self.log({
+                "category": "observation",
+                "message": f"no element found for {observation}",
+                "level": 1
+            })
+            return None
+
+        self.log({
+            "category": "observation",
+            "message": f"found element {element_id}",
+            "level": 1
+        })
+
+        selector = selector_map[int(element_id)]
+        locator_string = f"xpath={selector}"
+
+        self.log({
+            "category": "observation",
+            "message": f"found locator {locator_string}",
+            "level": 1
+        })
+
+        # Verify element exists
+        element = self.driver.find_element(By.XPATH, selector)
+        if not element:
+            return None
+            
+        observation_id = self.record_observation(observation, locator_string)
+        return observation_id
+
+    def ask(
+        self,
+        question: str,
+        model_name: Optional[str] = None
+    ) -> Optional[str]:
+        """Ask a question about the current page."""
+        self.wait_for_settled_dom()
+
+        return self.ask({
+            "question": question,
+            "llm_provider": self.llm_provider,
+            "model_name": model_name or self.default_model_name
+        })
 
     def set_driver(self, driver: WebDriver) -> None:
         """Set the WebDriver instance."""
