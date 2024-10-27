@@ -175,7 +175,48 @@ class Stagehand:
                 self.driver.execute_script("if (typeof window.cleanupDebug === 'function') { window.cleanupDebug(); }")
         except Exception:
             # Silently handle cleanup errors
-            pass            
+            pass
+
+    def wait_for_settled_dom(self) -> None:
+        """Wait for the DOM to be fully loaded and settled."""
+        try:
+            # Wait for body element to be present
+            WebDriverWait(self.driver, 10).until(
+                lambda d: d.find_element(By.TAG_NAME, "body")
+            )
+            
+            # Wait for document ready state
+            WebDriverWait(self.driver, 10).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+            
+            # Check for custom waitForDomSettle function and use it if available
+            try:
+                self.driver.execute_script("""
+                    return new Promise((resolve) => {
+                        if (typeof window.waitForDomSettle === 'function') {
+                            window.waitForDomSettle().then(() => {
+                                resolve(true);
+                            });
+                        } else {
+                            console.warn('waitForDomSettle is not defined, considering DOM as settled');
+                            resolve(true);
+                        }
+                    });
+                """)
+            except Exception as e:
+                self.log({
+                    "category": "dom",
+                    "message": f"Error waiting for DOM settle function: {str(e)}",
+                    "level": 1
+                })
+                
+        except Exception as e:
+            self.log({
+                "category": "dom",
+                "message": f"Error in wait_for_settled_dom: {str(e)}\nTrace: {traceback.format_exc()}",
+                "level": 1
+            })        
 
     def act(self, 
             action: str,
