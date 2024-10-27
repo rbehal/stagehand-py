@@ -18,7 +18,7 @@ class OpenAIClient(LLMClient):
         self.logger = logger if logger else get_default_logger("OpenAIClient")
 
     def create_chat_completion(self, options: ChatCompletionOptions) -> Dict[str, Any]:
-        self.logger.info(f"Creating chat completion with options: {json.dumps(options.dict())}")
+        self.logger.info(f"Creating chat completion with options: {json.dumps(options.model_dump(exclude={'response_model'}))}")
 
         if options.image:
             screenshot_message = {

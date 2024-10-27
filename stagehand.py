@@ -545,15 +545,15 @@ class Stagehand:
                 else:
                     dom_elements = self.driver.execute_script("return window.processAllOfDom()")["outputString"]
 
-                action_complete = verify_act_completion({
-                    "goal": action,
-                    "steps": new_steps,
-                    "llm_provider": self.llm_provider,
-                    "model_name": model,
-                    "screenshot": fullpage_screenshot,
-                    "dom_elements": dom_elements,
-                    "logger": self.logger
-                })
+                action_complete = verify_act_completion(
+                    action,
+                    new_steps,
+                    self.llm_provider,
+                    model,
+                    screenshot=fullpage_screenshot,
+                    dom_elements=dom_elements,
+                    logger=self.logger
+                )
 
                 self.log({
                     "category": "action",

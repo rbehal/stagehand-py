@@ -21,7 +21,7 @@ from .prompt import (
 )
 
 from .llm.LLMProvider import LLMProvider
-from .llm.LLMClient import ChatCompletionOptions, ANNOTATED_SCREENSHOT_TEXT
+from .llm.LLMClient import ChatCompletionOptions, ResponseModel, ANNOTATED_SCREENSHOT_TEXT
 
 from utils.logger import get_default_logger
 
@@ -45,19 +45,18 @@ def verify_act_completion(
     class Verification(BaseModel):
         completed: bool = False
 
-    response = llm_client.create_chat_completion(
+    options = ChatCompletionOptions(
         model=model_name,
         messages=messages,
         temperature=0.1,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0,
-        image={
-            "buffer": screenshot,
-            "description": "This is a screenshot of the whole visible page."
-        } if screenshot else None,
-        response_model=Verification
+        image={"buffer": screenshot, "description": ANNOTATED_SCREENSHOT_TEXT} if screenshot else None,
+        response_model=ResponseModel(name='verification', schema=Verification)
     )
+
+    response = llm_client.create_chat_completion(options=options)
 
     if not response or not isinstance(response, dict):
         logger.error(f"Unexpected response format: {response}")
@@ -197,7 +196,7 @@ def observe(
     model_name: str
 ) -> str:
     llm_client = llm_provider.get_client(model_name)
-    observation_response = llm_client.create_chat_completion(
+    options = ChatCompletionOptions(
         model=model_name,
         messages=[
             build_observe_system_prompt(),
@@ -208,6 +207,8 @@ def observe(
         frequency_penalty=0,
         presence_penalty=0
     )
+
+    observation_response = llm_client.create_chat_completion(options=options)
 
     element_id = observation_response.choices[0].message.content
 
@@ -222,7 +223,7 @@ def ask(
     model_name: str
 ) -> str:
     llm_client = llm_provider.get_client(model_name)
-    response = llm_client.create_chat_completion(
+    options = ChatCompletionOptions(
         model=model_name,
         messages=[
             build_ask_system_prompt(),
@@ -233,5 +234,7 @@ def ask(
         frequency_penalty=0,
         presence_penalty=0
     )
+
+    response = llm_client.create_chat_completion(options=options)
 
     return response.choices[0].message.content

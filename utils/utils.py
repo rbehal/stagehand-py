@@ -2,8 +2,11 @@ import os
 import json
 import tempfile
 from pathlib import Path
+from typing import Optional
 from pydantic import BaseModel
 from typing import Dict, Any, Callable
+
+from langchain_core.utils.function_calling import convert_pydantic_to_openai_function as langchain_convert_pydantic_to_openai_function
 
 from selenium import webdriver
 from selenium_stealth import stealth
@@ -11,10 +14,53 @@ from selenium.webdriver.chrome.options import Options
 
 from .logger import get_default_logger
 
+def convert_pydantic_to_openai_function(
+    model: type,
+    *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    rm_titles: bool = True,
+
+):
+    langchain_response = langchain_convert_pydantic_to_openai_function(
+        model,
+        name=name,
+        description=description,
+        rm_titles=rm_titles
+    )
+    
+    # OpenAI does not support 'default' kwarg, which is present in langchain converted schema
+    def remove_defaults(obj):
+        if isinstance(obj, dict):
+            if "default" in obj:
+                del obj["default"]
+            for value in obj.values():
+                remove_defaults(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                remove_defaults(item)
+        return obj
+    openai_function = remove_defaults(langchain_response)
+    
+    # Add required fields
+    required_fields = list(openai_function['parameters']["properties"].keys())
+    openai_function['parameters']["required"] = required_fields
+
+    # Add additional properties
+    openai_function['parameters']['additionalProperties'] = False
+
+    return openai_function
+
 def get_json_response_format(schema: BaseModel, name: str) -> Dict[str, Any]:
+    openai_function_parameters = convert_pydantic_to_openai_function(schema)["parameters"]
+    
     return {
-        "type": "json_object", 
-        "schema": schema.model_json_schema()
+        "type": "json_schema", 
+        "json_schema": {
+            "name": name, 
+            "schema": openai_function_parameters,
+            "strict": True
+        }
     }
 
 def get_browser(
