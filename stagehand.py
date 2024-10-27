@@ -202,7 +202,7 @@ class Stagehand:
         """Internal method to perform an action."""
         model = model_name or self.default_model_name
 
-        if not MODELS_WITH_VISION.includes(model) and (use_vision is not False or verifier_use_vision):
+        if not model in MODELS_WITH_VISION and (use_vision is not False or verifier_use_vision):
             self.log({
                 "category": "action",
                 "message": f"{model} does not support vision, but use_vision was set to {use_vision}. Defaulting to false.",
@@ -245,7 +245,7 @@ class Stagehand:
         # Handle vision if enabled
         annotated_screenshot = None
         if use_vision is True:
-            if not MODELS_WITH_VISION.includes(model):
+            if not model in MODELS_WITH_VISION:
                 self.log({
                     "category": "action",
                     "message": f"{model} does not support vision. Skipping vision processing.",
