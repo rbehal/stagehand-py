@@ -787,3 +787,21 @@ class Stagehand:
     def set_driver(self, driver: WebDriver) -> None:
         """Set the WebDriver instance."""
         self.driver = driver
+
+    def record_observation(self, observation: str, result: str) -> str:
+        """Record an observation and its result."""
+        observation_id = hashlib.sha256(observation.encode()).hexdigest()
+        self.observations[observation_id] = {
+            "result": result,
+            "observation": observation
+        }
+        return observation_id
+
+    def record_action(self, action: str, result: str) -> str:
+        """Record an action and its result."""
+        action_id = hashlib.sha256(action.encode()).hexdigest()
+        self.actions[action_id] = {
+            "result": result,
+            "action": action
+        }
+        return action_id
