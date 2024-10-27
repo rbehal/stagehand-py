@@ -261,7 +261,8 @@ class Stagehand:
         )
 
     def _act(self,
-             action: str, 
+             action: str,
+             steps: str = "",
              model_name: Optional[str] = None,
              chunks_seen: Optional[List[str]] = None,
              use_vision: bool = False,
@@ -330,7 +331,7 @@ class Stagehand:
         response = act(
             action, 
             output_string, 
-            None, 
+            steps, 
             self.llm_provider, 
             model,
             screenshot=annotated_screenshot,
@@ -357,7 +358,7 @@ class Stagehand:
 
                 return self._act(
                     action=action,
-                    steps="## Step: Scrolled to another section\n",
+                    steps=steps + ("\n" if not steps.endswith("\n") else "") + "## Step: Scrolled to another section\n",
                     chunks_seen=chunks_seen,
                     model_name=model_name,
                     use_vision=use_vision,
@@ -372,7 +373,7 @@ class Stagehand:
                 self.driver.execute_script("window.scrollTo(0, 0)")
                 return self._act(
                     action=action,
-                    steps="",
+                    steps=steps,
                     chunks_seen=chunks_seen,
                     model_name=model_name,
                     use_vision=True,
@@ -486,7 +487,7 @@ class Stagehand:
                 if retries < 2:
                     return self._act(
                         action=action,
-                        steps="",
+                        steps=steps,
                         model_name=model,
                         use_vision=use_vision,
                         verifier_use_vision=verifier_use_vision,
@@ -501,11 +502,12 @@ class Stagehand:
                     }
 
             new_steps = (
-                "" +
-                "## Step: " + response["step"] + "\n" +
-                "  Element: " + element_text + "\n" +
-                "  Action: " + response["method"] + "\n" +
-                "  Reasoning: " + response["why"] + "\n"
+                steps +
+                ("\n" if not steps.endswith("\n") else "") +
+                f"## Step: {response['step']}\n"
+                f"  Element: {element_text}\n" 
+                f"  Action: {response['method']}\n"
+                f"  Reasoning: {response['why']}\n"
             )
 
             if url_change_string:
@@ -592,7 +594,7 @@ class Stagehand:
             if retries < 2:
                 return self._act(
                     action=action,
-                    steps="",
+                    steps=steps,
                     model_name=model_name,
                     use_vision=use_vision,
                     verifier_use_vision=verifier_use_vision,
