@@ -2,3 +2,5 @@ anthropic
 openai
 pydantic
 python-dotenv
+selenium
+selenium-stealth
