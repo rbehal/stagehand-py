@@ -1,6 +1,8 @@
 from typing import Dict, Callable
-from .openai_client import OpenAIClient
-from .anthropic_client import AnthropicClient
+
+from .OpenAIClient import OpenAIClient
+from .AnthropicClient import AnthropicClient
+
 from .LLMClient import LLMClient
 
 class LLMProvider:

@@ -13,7 +13,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from utils import get_browser
+from utils.utils import get_browser
 from utils.logger import get_default_logger
 
 from lib.vision import ScreenshotService

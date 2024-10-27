@@ -1,6 +1,15 @@
+import os
+import sys
 import time
 import argparse
 from typing import Dict, Callable
+
+# Add the parent directory to sys.path
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
+
+from dotenv import load_dotenv
+load_dotenv('.env')
 
 from individual_evals.google_jobs import run_google_jobs_eval
 from individual_evals.wikipedia import run_wikipedia_eval

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionTool
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 
 # Models for function parameters
 class DoActionParams(BaseModel):
@@ -115,7 +115,7 @@ def build_act_user_prompt(
     }
 
 # Tools configuration
-act_tools: List[ChatCompletionTool] = [
+act_tools: List[ChatCompletionToolParam] = [
     {
         "type": "function",
         "function": {

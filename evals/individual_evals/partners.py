@@ -2,8 +2,6 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Any, List
 
-from utils.logger import EvalLogger
-
 from stagehand import Stagehand
 
 @dataclass
@@ -11,22 +9,13 @@ class Partner:
     name: str
     explanation: str
 
-def extract_partners() -> Dict[str, Any]:
-    logger = EvalLogger()
-    
+def run_partners_eval() -> Dict[str, Any]:
     stagehand = Stagehand(
         env=os.environ.get('ENVIRONMENT', 'LOCAL'),
         verbose=2,
         debug_dom=True,
         headless=os.environ.get('HEADLESS', 'true').lower() != 'false',
-        logger=lambda message: logger.log(message['message'])
     )
-
-    logger.init(stagehand)
-    
-    browser_info = stagehand.init(model_name="gpt-4")
-    debug_url = browser_info.get("debug_url")
-    session_url = browser_info.get("session_url")
 
     try:
         stagehand.driver.get("https://ramp.com")
@@ -57,7 +46,7 @@ def extract_partners() -> Dict[str, Any]:
         ]
 
         if partners.get("explanation"):
-            logger.log(f"Explanation: {partners['explanation']}")
+            print(f"Explanation: {partners['explanation']}")
 
         found_partners = [p["name"].lower() for p in partners["partners"]]
         
@@ -65,29 +54,9 @@ def extract_partners() -> Dict[str, Any]:
             p.lower() in found_partners for p in expected_partners
         )
 
-        logger.log(f"All expected partners found: {all_expected_found}")
-        logger.log(f"Expected: {expected_partners}")
-        logger.log(f"Found: {found_partners}")
-
-        return {
-            "_success": all_expected_found,
-            "partners": partners,
-            "debug_url": debug_url,
-            "session_url": session_url,
-            "logs": logger.get_logs()
-        }
-
-    except Exception as error:
-        logger.error(
-            f"Error in extract_partners function: {str(error)}\nTrace: {error.__traceback__}"
-        )
-        return {
-            "_success": False,
-            "debug_url": debug_url,
-            "session_url": session_url,
-            "error": str(error),
-            "logs": logger.get_logs()
-        }
+        print(f"All expected partners found: {all_expected_found}")
+        print(f"Expected: {expected_partners}")
+        print(f"Found: {found_partners}")
 
     finally:
         stagehand.driver.quit()

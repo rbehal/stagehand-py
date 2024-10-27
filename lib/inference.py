@@ -19,8 +19,10 @@ from .prompt import (
     build_metadata_prompt,
 )
 
-from .llm import LLMProvider, AnnotatedScreenshotText
-from ..utils.logger import get_default_logger
+from .llm.LLMProvider import LLMProvider
+from .llm.LLMClient import ANNOTATED_SCREENSHOT_TEXT
+
+from utils.logger import get_default_logger
 
 
 def verify_act_completion(
@@ -91,7 +93,7 @@ def act(
         presence_penalty=0,
         tool_choice="auto",
         tools=act_tools,
-        image={"buffer": screenshot, "description": AnnotatedScreenshotText} if screenshot else None
+        image={"buffer": screenshot, "description": ANNOTATED_SCREENSHOT_TEXT} if screenshot else None
     )
 
     tool_calls = response.choices[0].message.tool_calls
