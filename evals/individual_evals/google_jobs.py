@@ -12,10 +12,9 @@ class JobPosting(BaseModel):
 
 def run_google_jobs_eval():
     stagehand = Stagehand(env="LOCAL")
-    stagehand.init()
     
     try:
-        stagehand.driver.get("https://www.google.com")
+        stagehand.goto("https://www.google.com")
 
         stagehand.act("click on the about page")
 

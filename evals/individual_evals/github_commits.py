@@ -9,10 +9,9 @@ class Commit(BaseModel):
 
 def run_github_commits_eval():
     stagehand = Stagehand(env="LOCAL")
-    stagehand.init()
     
     try:
-        stagehand.driver.get("https://github.com/facebook/react")
+        stagehand.goto("https://github.com/facebook/react")
 
         stagehand.act("find commit history, generally described by the number of commits")
         

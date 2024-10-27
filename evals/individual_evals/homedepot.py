@@ -6,10 +6,9 @@ class ProductSpecs(BaseModel):
 
 def run_homedepot_eval():
     stagehand = Stagehand(env="LOCAL")
-    stagehand.init()
     
     try:
-        stagehand.driver.get("https://www.homedepot.com/")
+        stagehand.goto("https://www.homedepot.com/")
 
         stagehand.act("search for gas grills")
 

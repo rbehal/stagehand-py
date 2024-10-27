@@ -9,10 +9,9 @@ class WikipediaContent(BaseModel):
 
 def run_wikipedia_eval():
     stagehand = Stagehand(env="LOCAL")
-    stagehand.init()
     
     try:
-        stagehand.driver.get("https://en.wikipedia.org/wiki/Baseball")
+        stagehand.goto("https://en.wikipedia.org/wiki/Baseball")
         
         stagehand.act("click the 'hit and run' link in this article")
 

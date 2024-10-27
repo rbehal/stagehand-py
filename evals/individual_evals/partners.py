@@ -10,15 +10,10 @@ class Partner:
     explanation: str
 
 def run_partners_eval() -> Dict[str, Any]:
-    stagehand = Stagehand(
-        env=os.environ.get('ENVIRONMENT', 'LOCAL'),
-        verbose=2,
-        debug_dom=True,
-        headless=os.environ.get('HEADLESS', 'true').lower() != 'false',
-    )
+    stagehand = Stagehand()
 
     try:
-        stagehand.driver.get("https://ramp.com")
+        stagehand.goto("https://ramp.com")
 
         stagehand.act(action="Close the popup.")
 

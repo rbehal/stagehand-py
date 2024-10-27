@@ -56,6 +56,8 @@ class Stagehand:
         self.pending_logs: List[Dict[str, Any]] = []
         self.is_processing_logs = False
 
+        self._init()
+
     def log(self, log_obj: Dict[str, Any]) -> None:
         """Handle logging for the Stagehand instance."""
         log_obj["level"] = log_obj.get("level", 1)
@@ -111,7 +113,7 @@ class Stagehand:
                 # Handle page navigation errors silently
                 pass
 
-    def init(self, model_name: str = "gpt-4") -> Dict[str, Optional[str]]:
+    def _init(self, model_name: str = "gpt-4") -> Dict[str, Optional[str]]:
         """Initialize the Stagehand instance."""
         browser_info = get_browser(self.env, self.headless, self.logger)
         self.driver = browser_info["driver"]
@@ -131,6 +133,31 @@ class Stagehand:
             "debug_url": browser_info.get("debug_url"),
             "session_url": browser_info.get("session_url")
         }
+    
+    def goto(self, url: str) -> None:
+        """Navigate to a URL and ensure scripts are properly initialized.
+        
+        Args:
+            url: The URL to navigate to
+        """
+        self.logger.info(f"Navigating to: {url}")
+        
+        try:
+            self.driver.get(url)
+            self.wait_for_settled_dom()
+            
+            # We have to reinject scripts after navigation as the javascript context reloads in Selenium
+            script_dir = Path(__file__).parent / "lib" / "scripts"
+            for script in ["process.js", "utils.js", "debug.js"]:
+                script_path = script_dir / script
+                self.logger.info(f"Reinjecting script: {script_path}")
+                
+                with open(script_path, encoding='utf-8') as f:
+                    script_content = f.read()
+                    self.driver.execute_script(script_content)
+        except Exception as e:
+            self.logger.error(f"Error navigating to {url}: {str(e)}\nTrace: {traceback.format_exc()}")
+            raise    
 
     def download_pdf(self, url: str, title: str) -> None:
         """Download a PDF file."""
