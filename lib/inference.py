@@ -81,7 +81,7 @@ def act(
     llm_client = llm_provider.get_client(model_name)
     messages = [
         build_act_system_prompt(),
-        build_act_user_prompt(action, steps, dom_elements)
+        build_act_user_prompt(action, dom_elements, steps)
     ]
 
     options = ChatCompletionOptions(

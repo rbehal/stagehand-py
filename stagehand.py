@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import random
 import hashlib
 import traceback
 from pathlib import Path
@@ -12,6 +13,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.common.action_chains import ActionChains
 
 from utils.utils import get_browser
 from utils.logger import get_default_logger
@@ -19,7 +21,7 @@ from utils.logger import get_default_logger
 from lib.vision import ScreenshotService
 from lib.llm.LLMProvider import LLMProvider
 from lib.llm.LLMClient import MODELS_WITH_VISION
-from lib.inference import act, verify_act_completion
+from lib.inference import act, extract, observe, verify_act_completion
 
 load_dotenv()
 
@@ -481,6 +483,31 @@ class Stagehand:
                     # Re-inject scripts after navigation, as JS context resets
                     self._inject_scripts()
 
+            elif method in ["fill", "type"]:
+                try:
+                    element.clear()
+                    element.click()
+                    text = args[0]
+                    for char in text:
+                        ActionChains(self.driver).send_keys(char).perform()
+                        time.sleep(random.uniform(0.025, 0.075))
+                except Exception as e:
+                    self.log({
+                        "category": "action",
+                        "message": f"Error filling element (Retries {retries}): {str(e)}\nTrace: {traceback.format_exc()}",
+                        "level": 1
+                    })
+                    if retries < 2:
+                        return self._act(
+                            action=action,
+                            steps=steps,
+                            model_name=model,
+                            use_vision=use_vision,
+                            verifier_use_vision=verifier_use_vision,
+                            retries=retries + 1,
+                            chunks_seen=chunks_seen
+                        )
+
             else:
                 self.log({
                     "category": "action",
@@ -648,17 +675,17 @@ class Stagehand:
             "level": 1
         })
 
-        extraction_response = self.extract({
-            "instruction": instruction,
-            "progress": progress,
-            "previously_extracted_content": content,
-            "dom_elements": output_string,
-            "llm_provider": self.llm_provider,
-            "schema": schema,
-            "model_name": model_name or self.default_model_name,
-            "chunks_seen": len(chunks_seen),
-            "chunks_total": len(chunks)
-        })
+        extraction_response = extract(
+            instruction,
+            progress,
+            content,
+            output_string,
+            schema,
+            self.llm_provider,
+            model_name or self.default_model_name,
+            len(chunks_seen),
+            len(chunks)
+        )
 
         metadata = extraction_response.pop("metadata", {})
         new_progress = metadata.get("progress", "")
@@ -730,12 +757,12 @@ class Stagehand:
         output_string = result["outputString"]
         selector_map = result["selectorMap"]
 
-        element_id = self.observe({
-            "observation": observation,
-            "dom_elements": output_string,
-            "llm_provider": self.llm_provider,
-            "model_name": model_name or self.default_model_name
-        })
+        element_id = observe(
+            observation,
+            output_string,
+            self.llm_provider,
+            model_name or self.default_model_name
+        )
         
         self.cleanup_dom_debug()
 
