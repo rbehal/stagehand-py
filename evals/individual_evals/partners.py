@@ -1,11 +1,9 @@
-import os
-from dataclasses import dataclass
+from pydantic import BaseModel
 from typing import Dict, Any, List
 
 from stagehand import Stagehand
 
-@dataclass
-class Partner:
+class Partner(BaseModel):
     name: str
     explanation: str
 
@@ -40,11 +38,7 @@ def run_partners_eval() -> Dict[str, Any]:
             "Affiliates"
         ]
 
-        if partners.get("explanation"):
-            print(f"Explanation: {partners['explanation']}")
-
-        found_partners = [p["name"].lower() for p in partners["partners"]]
-        
+        found_partners = [p["name"].lower() for p in partners["partners"]]    
         all_expected_found = all(
             p.lower() in found_partners for p in expected_partners
         )

@@ -299,6 +299,10 @@ class Stagehand:
              verifier_use_vision: bool = True,
              retries: int = 0) -> Dict[str, Any]:
         """Internal method to perform an action."""
+        # Inject scripts before every action to be sure processDom() is available
+        # TODO: Only inject it where necessary in the future
+        self._inject_scripts() 
+
         model = model_name or self.default_model_name
 
         if not model in MODELS_WITH_VISION and (use_vision is not False or verifier_use_vision):
@@ -664,6 +668,10 @@ class Stagehand:
         use_vision: Optional[bool] = False
     ) -> Dict[str, Any]:
         """Internal method to handle extraction across chunks."""
+        # Inject scripts before every extract to be sure processDom() is available
+        # TODO: Only inject it where necessary in the future
+        self._inject_scripts() 
+        
         model = model_name or self.default_model_name
 
         content = content or {}
