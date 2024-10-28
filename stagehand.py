@@ -749,7 +749,8 @@ class Stagehand:
                 progress=new_progress,
                 content=output,
                 chunks_seen=chunks_seen,
-                model_name=model_name
+                model_name=model_name,
+                use_vision=use_vision
             )
 
     def extract(
