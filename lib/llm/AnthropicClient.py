@@ -10,7 +10,7 @@ from anthropic.types import TextBlock
 
 from utils.logger import get_default_logger
 
-from .LLMClient import LLMClient, ChatCompletionOptions, ExtractionOptions
+from .LLMClient import LLMClient, ChatCompletionOptions
 
 
 class AnthropicClient(LLMClient):
@@ -124,42 +124,3 @@ class AnthropicClient(LLMClient):
                 raise ValueError("Extraction failed: No tool use with input in response")
 
         return transformed_response
-
-    def create_extraction(self, options: ExtractionOptions) -> Dict[str, Any]:
-        self.logger.info(f"Creating extraction with options: {json.dumps(options.dict())}")
-
-        json_schema = options.response_model.schema.schema()
-        schema_properties = json_schema.get("properties", {})
-        schema_required = json_schema.get("required", [])
-
-        tool_definition = {
-            "name": "extract_data",
-            "description": "Extracts specific data from the given content based on the provided schema.",
-            "input_schema": {
-                "type": "object",
-                "properties": schema_properties,
-                "required": schema_required
-            }
-        }
-
-        system_message = next((msg for msg in options.messages if msg.role == "system"), None)
-        user_messages = [msg for msg in options.messages if msg.role != "system"]
-
-        response = self.client.messages.create(
-            model=options.model or "claude-3-opus-20240229",
-            max_tokens=options.max_tokens or 1000,
-            messages=[{"role": msg.role, "content": msg.content} for msg in user_messages],
-            system=system_message.content if system_message else "You are an AI assistant capable of extracting structured data from text.",
-            temperature=options.temperature or 0.1,
-            tools=[tool_definition]
-        )
-
-        self.logger.debug(f"Response from Anthropic: {json.dumps(response.dict())}")
-
-        tool_use = next((c for c in response.content if c.type == "tool_use"), None)
-        if tool_use and hasattr(tool_use, 'input'):
-            extracted_data = tool_use.input
-            self.logger.debug(f"Extracted data: {json.dumps(extracted_data)}")
-            return extracted_data
-        else:
-            raise ValueError("Extraction failed: No tool use with input in response")

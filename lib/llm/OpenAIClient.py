@@ -9,7 +9,7 @@ from openai import OpenAI, NOT_GIVEN
 from utils.logger import get_default_logger
 from utils.utils import get_json_response_format
 
-from .LLMClient import LLMClient, ChatCompletionOptions, ExtractionOptions
+from .LLMClient import LLMClient, ChatCompletionOptions
 
 
 class OpenAIClient(LLMClient):
@@ -62,23 +62,3 @@ class OpenAIClient(LLMClient):
             return parsed_data
 
         return response
-
-    def create_extraction(self, options: ExtractionOptions) -> Dict[str, Any]:
-        self.logger.info(f"Creating extraction with options: {json.dumps(options.dict())}")
-
-        response_format = get_json_response_format(
-            options.response_model.schema,
-            options.response_model.name
-        )
-
-        completion = self.client.chat.completions.create(
-            model=options.model,
-            messages=[msg.dict() for msg in options.messages],
-            response_format=response_format
-        )
-
-        extracted_data = completion.choices[0].message.content
-        self.logger.debug(f"Extracted data: {extracted_data}")
-
-        parsed_data = json.loads(extracted_data)
-        return parsed_data

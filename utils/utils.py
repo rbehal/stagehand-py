@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
-from typing import Dict, Any, Callable
+from typing import Callable, Optional, Dict, Any, get_origin, get_args
 
 from langchain_core.utils.function_calling import convert_pydantic_to_openai_function as langchain_convert_pydantic_to_openai_function
 
@@ -14,14 +14,53 @@ from selenium.webdriver.chrome.options import Options
 
 from .logger import get_default_logger
 
+def is_list_of_basemodel(type_hint) -> bool:
+    """Check if a type hint is List[BaseModel]"""
+    origin = get_origin(type_hint)
+    if origin is not None and origin is list:
+        args = get_args(type_hint)
+        if len(args) == 1 and isinstance(args[0], type) and issubclass(args[0], BaseModel):
+            return True
+    return False
+
 def convert_pydantic_to_openai_function(
     model: type,
     *,
     name: Optional[str] = None,
     description: Optional[str] = None,
     rm_titles: bool = True,
-
 ):
+    # Handle List[BaseModel] case
+    if is_list_of_basemodel(model):
+        base_model = get_args(model)[0]
+        # Convert the base model first
+        base_schema = convert_pydantic_to_openai_function(
+            base_model,
+            name=name,
+            description=description,
+            rm_titles=rm_titles
+        )
+        
+        # Create array schema
+        array_schema = {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": base_schema["parameters"]
+                }
+            },
+            "required": ["items"],
+            "additionalProperties": False
+        }
+        
+        return {
+            "name": name or base_model.__name__,
+            "description": description or f"List of {base_model.__name__} objects",
+            "parameters": array_schema
+        }
+    
+    # Original case for single BaseModel
     langchain_response = langchain_convert_pydantic_to_openai_function(
         model,
         name=name,
@@ -40,24 +79,25 @@ def convert_pydantic_to_openai_function(
             for item in obj:
                 remove_defaults(item)
         return obj
+    
     openai_function = remove_defaults(langchain_response)
     
     # Add required fields
     required_fields = list(openai_function['parameters']["properties"].keys())
     openai_function['parameters']["required"] = required_fields
-
+    
     # Add additional properties
     openai_function['parameters']['additionalProperties'] = False
-
+    
     return openai_function
 
-def get_json_response_format(schema: BaseModel, name: str) -> Dict[str, Any]:
+def get_json_response_format(schema: type, name: str) -> Dict[str, Any]:
     openai_function_parameters = convert_pydantic_to_openai_function(schema)["parameters"]
     
     return {
-        "type": "json_schema", 
+        "type": "json_schema",
         "json_schema": {
-            "name": name, 
+            "name": name,
             "schema": openai_function_parameters,
             "strict": True
         }

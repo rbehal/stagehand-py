@@ -1,6 +1,6 @@
 import json
 from pydantic import BaseModel
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Union, List
 
 from .prompt import (
     act_tools,
@@ -24,6 +24,7 @@ from .llm.LLMProvider import LLMProvider
 from .llm.LLMClient import ChatCompletionOptions, ResponseModel, ANNOTATED_SCREENSHOT_TEXT
 
 from utils.logger import get_default_logger
+from utils.utils import is_list_of_basemodel
 
 
 def verify_act_completion(
@@ -126,7 +127,7 @@ def extract(
     progress: str,
     previously_extracted_content: Any,
     dom_elements: str,
-    schema: BaseModel,
+    schema: Union[BaseModel, List[BaseModel]],
     llm_provider: LLMProvider,
     model_name: str,
     chunks_seen: int,
@@ -134,20 +135,22 @@ def extract(
 ) -> Dict:
     llm_client = llm_provider.get_client(model_name)
 
-    extraction_response = llm_client.create_extraction(
+    extraction_options = ChatCompletionOptions(
         model=model_name,
         messages=[
             build_extract_system_prompt(),
             build_extract_user_prompt(instruction, dom_elements)
         ],
-        response_model=schema,
+        response_model=ResponseModel(name="Extraction", schema=schema),
         temperature=0.1,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
     )
 
-    refined_response = llm_client.create_extraction(
+    extraction_response = llm_client.create_chat_completion(options=extraction_options)
+
+    refine_options = ChatCompletionOptions(
         model=model_name,
         messages=[
             build_refine_system_prompt(),
@@ -157,18 +160,24 @@ def extract(
                 extraction_response
             )
         ],
-        response_model=schema,
+        response_model=ResponseModel(name="RefinedExtraction", schema=schema),
         temperature=0.1,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
     )
 
+    refined_response = llm_client.create_chat_completion(options=refine_options)
+
+    # Handle List[BaseModel] case
+    if is_list_of_basemodel(schema) and 'items' in refined_response:
+        refined_response = refined_response['items']
+
     class MetadataSchema(BaseModel):
         progress: str
         completed: bool
 
-    metadata_response = llm_client.create_extraction(
+    metadata_options = ChatCompletionOptions(
         model=model_name,
         messages=[
             build_metadata_system_prompt(),
@@ -179,14 +188,22 @@ def extract(
                 chunks_total
             )
         ],
-        response_model=MetadataSchema,
+        response_model=ResponseModel(name="Metadata", schema=MetadataSchema),
         temperature=0.1,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
     )
 
-    refined_response["metadata"] = metadata_response
+    metadata_response = llm_client.create_chat_completion(options=metadata_options)
+
+    if isinstance(refined_response, dict):
+        refined_response["metadata"] = metadata_response
+    else:
+        refined_response = {
+            "items": refined_response,
+            "metadata": metadata_response
+        }
     return refined_response
 
 def observe(

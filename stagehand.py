@@ -644,7 +644,7 @@ class Stagehand:
         instruction: str,
         schema: Any,
         progress: str = "",
-        content: Dict = None,
+        content: Union[Dict, List] = None,
         chunks_seen: List[int] = None,
         model_name: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -688,9 +688,14 @@ class Stagehand:
         )
 
         metadata = extraction_response.pop("metadata", {})
+
         new_progress = metadata.get("progress", "")
         completed = metadata.get("completed", False)
+        
         output = extraction_response
+        # If we're extracting List[BaseModel], then the actual extracted values will be in the "items" key, so set that to the output
+        if isinstance(output, dict) and "items" in output and isinstance(output.get("items"), list):
+            output = output.get("items")
         
         self.cleanup_dom_debug()
 

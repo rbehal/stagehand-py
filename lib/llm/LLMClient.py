@@ -78,14 +78,8 @@ class ChatCompletionOptions(BaseModel):
     tools: Optional[List[Tool]] = None
     response_model: Optional[ResponseModel] = None
 
-class ExtractionOptions(ChatCompletionOptions):
-    response_model: ResponseModel
-
 class LLMClient:
     def create_chat_completion(self, options: ChatCompletionOptions) -> Any:
-        raise NotImplementedError
-
-    def create_extraction(self, options: ExtractionOptions) -> Any:
         raise NotImplementedError
 
     def logger(self, message: Dict[str, str]) -> None:
