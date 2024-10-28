@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Union, List, Optional
 
 from langchain_core.utils.function_calling import convert_pydantic_to_openai_function
 
@@ -137,15 +137,14 @@ act_tools: List[Tool] = [
     ),
 ]
 
-# Extract related prompts and functions
-extract_system_prompt = """You are extracting content on behalf of a user. You will be given:
-1. An instruction
-2. A list of DOM elements to extract from
-
-Return the exact text from the DOM elements with all symbols, characters, and endlines as is.
-Only extract new information that has not already been extracted. Return null or an empty string if no new information is found."""
-
 def build_extract_system_prompt() -> ChatCompletionMessageParam:
+    extract_system_prompt = """You are extracting content on behalf of a user. You will be given:
+    1. An instruction
+    2. A list of DOM elements to extract from
+    3. [Optional] Any previously extracted content
+
+    Return the exact text from the DOM elements with all symbols, characters, and endlines as is.
+    Only extract NEW information that has not already been extracted. Return null or an empty string if no new information is found."""    
     return {
         "role": "system",
         "content": extract_system_prompt.replace('\s+', ' ')
@@ -153,23 +152,32 @@ def build_extract_system_prompt() -> ChatCompletionMessageParam:
 
 def build_extract_user_prompt(
     instruction: str,
-    dom_elements: str
+    dom_elements: str,
+    previously_extracted_content: Optional[Union[List, dict]]
 ) -> ChatCompletionMessageParam:
+    content = f"<instruction>\n{instruction}\n</instruction>"
+    
+    if previously_extracted_content is not None:
+        if isinstance(previously_extracted_content, list):
+            content += f"\n\n\n<previously_extracted_content>\n({len(previously_extracted_content)} items):\n\n{previously_extracted_content}\n</previously_extracted_content>"
+        else:
+            content += f"\n<previously_extracted_content>\n{previously_extracted_content}\n</previously_extracted_content>"
+
+    content += f"\n\n\n<dom_elements>\n{dom_elements}\n</dom_elements>"
+    
     return {
         "role": "user",
-        "content": f"Instruction: {instruction}\n    DOM: {dom_elements}\n    Extracted content:"
+        "content": content
     }
 
-# Refine related prompts
-refine_system_prompt = """You are tasked with refining and filtering information for the final output based on newly extracted and previously extracted content. Your responsibilities are:
-1. Remove exact duplicates for elements in arrays and objects.
-2. For text fields, append or update relevant text if the new content is an extension, replacement, or continuation.
-3. For non-text fields (e.g., numbers, booleans), update with new values if they differ.
-4. Add any completely new fields or objects.
-
-Return the updated content that includes both the previous content and the new, non-duplicate, or extended information."""
-
 def build_refine_system_prompt() -> ChatCompletionMessageParam:
+    refine_system_prompt = """You are tasked with refining and filtering information for the final output based on newly extracted and previously extracted content. Your responsibilities are:
+    1. Remove exact duplicates for elements in arrays and objects.
+    2. For text fields, append or update relevant text if the new content is an extension, replacement, or continuation.
+    3. For non-text fields (e.g., numbers, booleans), update with new values if they differ.
+    4. Add any completely new fields or objects.
+
+    Return the updated content that includes both the previous content and the new, non-duplicate, or extended information."""    
     return {
         "role": "system",
         "content": refine_system_prompt
@@ -182,21 +190,31 @@ def build_refine_user_prompt(
 ) -> ChatCompletionMessageParam:
     return {
         "role": "user",
-        "content": f"""Instruction: {instruction}
-Previously extracted content: {previously_extracted_content}
-Newly extracted content: {newly_extracted_content}
-Refined content:"""
+        "content": f"""
+<instruction>
+{instruction}
+</instruction>
+
+
+<previously_extracted_content>
+{previously_extracted_content}
+</previously_extracted_content>
+
+
+<newly_extracted_content>
+{newly_extracted_content}
+</newly_extracted_content>
+"""
     }
 
-# Metadata related prompts
-metadata_system_prompt = """You are an AI assistant tasked with evaluating the progress and completion status of an extraction task.
-Analyze the extraction response and determine if the task is completed or if more information is needed.
-
-Strictly abide by the following criteria:
-1. If you are certain that the instruction is completed, set the completion status to true, even if there are still chunks left.
-2. If there could still be more information to extract and there are still chunks left, set the completion status to false."""
-
 def build_metadata_system_prompt() -> ChatCompletionMessageParam:
+    # Metadata related prompts
+    metadata_system_prompt = """You are an AI assistant tasked with evaluating the progress and completion status of an extraction task.
+    Analyze the extraction response and determine if the task is completed or if more information is needed.
+
+    Strictly abide by the following criteria:
+    1. If you are certain that the instruction is completed, set the completion status to true, even if there are still chunks left.
+    2. If there could still be more information to extract and there are still chunks left, set the completion status to false."""
     return {
         "role": "system",
         "content": metadata_system_prompt
@@ -204,28 +222,38 @@ def build_metadata_system_prompt() -> ChatCompletionMessageParam:
 
 def build_metadata_prompt(
     instruction: str,
-    extraction_response: dict,
+    extraction_response: Union[dict, List],
     chunks_seen: int,
     chunks_total: int
 ) -> ChatCompletionMessageParam:
+    extracted_content = f"{extraction_response}"
+    if isinstance(extraction_response, list):
+        extracted_content += f" (Total items: {len(extraction_response)})"
+
     return {
         "role": "user",
-        "content": f"""Instruction: {instruction}
-Extracted content: {extraction_response}
-Chunks seen: {chunks_seen}
-Chunks total: {chunks_total}"""
+        "content": f"""
+<instruction>
+{instruction}
+</instruction>
+
+
+<extracted_content>
+{extracted_content}
+</extracted_content>
+
+Number of Chunks Seen: {chunks_seen}
+Number of Chunks Total: {chunks_total}"""
     }
 
-# Observe related prompts
-observe_system_prompt = """
-You are helping the user automate the browser by finding a playwright locator string. You will be given a instruction of the element to find, and a numbered list of possible elements.
-
-return only element id we are looking for.
-
-if the element is not found, return NONE.
-"""
-
 def build_observe_system_prompt() -> ChatCompletionMessageParam:
+    observe_system_prompt = """
+    You are helping the user automate the browser by finding a playwright locator string. You will be given a instruction of the element to find, and a numbered list of possible elements.
+
+    return only element id we are looking for.
+
+    if the element is not found, return NONE.
+    """
     return {
         "role": "system",
         "content": observe_system_prompt.replace('\s+', ' ')
@@ -240,12 +268,10 @@ def build_observe_user_message(
         "content": f"instruction: {observation}\n    DOM: {dom_elements}"
     }
 
-# Ask related prompts
-ask_system_prompt = """
-you are a simple question answering assistent given the user's question. respond with only the answer.
-"""
-
 def build_ask_system_prompt() -> ChatCompletionMessageParam:
+    ask_system_prompt = """
+    you are a simple question answering assistent given the user's question. respond with only the answer.
+    """    
     return {
         "role": "system",
         "content": ask_system_prompt
