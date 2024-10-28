@@ -1,6 +1,7 @@
 import os
 import json
 import tempfile
+import requests
 from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from langchain_core.utils.function_calling import convert_pydantic_to_openai_fun
 from selenium import webdriver
 from selenium_stealth import stealth
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.remote.remote_connection import RemoteConnection
 
 from .logger import get_default_logger
 
@@ -120,8 +122,39 @@ def get_browser(
             env = "LOCAL"
 
     if env == "BROWSERBASE":
-        # Note: Implementation for Browserbase would need their Python SDK
-        raise NotImplementedError("Browserbase integration not yet implemented for Python")
+        response = requests.post(
+            "https://www.browserbase.com/v1/sessions",
+            headers={
+                "x-bb-api-key": os.environ.get('BROWSERBASE_API_KEY'),
+                "Content-Type": "application/json",
+            },
+            json={"projectId": os.environ.get('BROWSERBASE_PROJECT_ID')},
+        )
+
+        session = response.json()
+
+        class BrowserbaseRemoteConnection(RemoteConnection):
+            def get_remote_connection_headers(self, parsed_url, keep_alive=False):
+                # Call the super method to get the default headers
+                headers = super().get_remote_connection_headers(parsed_url, keep_alive)
+
+                # Add the Browserbase headers
+                headers["session-id"] = session["id"] 
+                headers["x-bb-api-key"] = os.environ.get('BROWSERBASE_API_KEY')
+                headers["enable-proxy"] = "true"
+
+                return headers
+
+        # This is needed to direct the Webdriver at the correct browser port
+        options = webdriver.ChromeOptions()
+        options.debugger_address = "localhost:9223"
+        # Create Browserbase remote driver
+        driver = webdriver.Remote(
+            command_executor=BrowserbaseRemoteConnection("http://connect.browserbase.com/webdriver"),
+            options=options,
+        )
+
+        return {"driver": driver}
     
     else:
         logger.info(f"Launching local browser in {'headless' if headless else 'headed'} mode")
