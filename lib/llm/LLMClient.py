@@ -1,6 +1,6 @@
 from typing import List, Union, Dict, Any, Optional
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 class MessageRole(str, Enum):
     SYSTEM = "system"
@@ -26,8 +26,9 @@ class ChatMessage(BaseModel):
 MODELS_WITH_VISION = [
     "gpt-4o",
     "gpt-4o-mini",
-    "claude-3-5-sonnet-20240620",
     "gpt-4o-2024-08-06",
+    "claude-3-5-sonnet-latest",
+    "claude-3-5-sonnet-20241022",
 ]
 
 ANNOTATED_SCREENSHOT_TEXT = "This is a screenshot of the current page state with the elements annotated on it. Each element id is annotated with a number to the top left of it. Duplicate annotations at the same location are under each other vertically."

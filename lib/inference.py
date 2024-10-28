@@ -53,7 +53,7 @@ def verify_act_completion(
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0,
-        image={"buffer": screenshot, "description": ANNOTATED_SCREENSHOT_TEXT} if screenshot else None,
+        image=Image(buffer=screenshot, description=ANNOTATED_SCREENSHOT_TEXT) if screenshot else None,
         response_model=ResponseModel(name='verification', schema=Verification)
     )
 

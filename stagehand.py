@@ -125,11 +125,10 @@ class Stagehand:
                 script_content = f.read()
                 self.driver.execute_script(script_content)
 
-    def _init(self, model_name: str = "gpt-4o") -> Dict[str, Optional[str]]:
+    def _init(self) -> Dict[str, Optional[str]]:
         """Initialize the Stagehand instance."""
         browser_info = get_browser(self.env, self.headless, self.logger)
         self.driver = browser_info["driver"]
-        self.default_model_name = model_name
 
         # Set viewport size if headless
         if self.headless:
