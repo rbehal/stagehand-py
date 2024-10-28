@@ -21,7 +21,7 @@ from .prompt import (
 )
 
 from .llm.LLMProvider import LLMProvider
-from .llm.LLMClient import ChatCompletionOptions, ResponseModel, ANNOTATED_SCREENSHOT_TEXT
+from .llm.LLMClient import ChatCompletionOptions, ResponseModel, Image, ANNOTATED_SCREENSHOT_TEXT
 
 from utils.logger import get_default_logger
 from utils.utils import is_list_of_basemodel
@@ -94,7 +94,7 @@ def act(
         presence_penalty=0,
         tool_choice="auto",
         tools=act_tools,
-        image={"buffer": screenshot, "description": ANNOTATED_SCREENSHOT_TEXT} if screenshot else None
+        image=Image(buffer=screenshot, description=ANNOTATED_SCREENSHOT_TEXT) if screenshot else None
     )
 
     response = llm_client.create_chat_completion(options=options)
@@ -125,13 +125,14 @@ def act(
 def extract(
     instruction: str,
     progress: str,
-    previously_extracted_content: Any,
+    previously_extracted_content: Union[dict, List],
     dom_elements: str,
     schema: Union[BaseModel, List[BaseModel]],
     llm_provider: LLMProvider,
     model_name: str,
     chunks_seen: int,
-    chunks_total: int
+    chunks_total: int,
+    screenshot: Optional[bytes] = None
 ) -> Dict:
     llm_client = llm_provider.get_client(model_name)
 
@@ -139,13 +140,14 @@ def extract(
         model=model_name,
         messages=[
             build_extract_system_prompt(),
-            build_extract_user_prompt(instruction, dom_elements)
+            build_extract_user_prompt(instruction, dom_elements, previously_extracted_content)
         ],
         response_model=ResponseModel(name="Extraction", schema=schema),
         temperature=0.1,
         top_p=1,
         frequency_penalty=0,
-        presence_penalty=0
+        presence_penalty=0,
+        image=Image(buffer=screenshot, description=ANNOTATED_SCREENSHOT_TEXT) if screenshot else None
     )
 
     extraction_response = llm_client.create_chat_completion(options=extraction_options)

@@ -20,7 +20,7 @@ from utils.logger import get_default_logger
 
 from lib.vision import ScreenshotService
 from lib.llm.LLMProvider import LLMProvider
-from lib.llm.LLMClient import MODELS_WITH_VISION
+from lib.llm.LLMClient import MODELS_WITH_VISION, Image
 from lib.inference import act, extract, observe, verify_act_completion
 
 load_dotenv()
@@ -244,7 +244,36 @@ class Stagehand:
                 "category": "dom",
                 "message": f"Error in wait_for_settled_dom: {str(e)}\nTrace: {traceback.format_exc()}",
                 "level": 1
-            })        
+            })
+
+    def _get_vision_screenshot(self, use_vision: bool, model: str, selector_map: Dict[str, str]) -> Optional[Image]:
+        """Get annotated screenshot for vision processing if enabled.
+        
+        Args:
+            use_vision: Whether vision processing is enabled
+            model: The LLM model being used
+            selector_map: Dictionary mapping element IDs to selectors
+            
+        Returns:
+            Optional[bytes]: Annotated screenshot bytes if vision is enabled and supported, None otherwise
+        """
+        if not use_vision:
+            return None
+            
+        if not model in MODELS_WITH_VISION:
+            self.log({
+                "category": "action",
+                "message": f"{model} does not support vision. Skipping vision processing.",
+                "level": 1
+            })
+            return None
+            
+        screenshot_service = ScreenshotService(
+            self.driver,
+            selector_map,
+            self.verbose
+        )
+        return screenshot_service.get_annotated_screenshot(False)
 
     def act(self, 
             action: str,
@@ -312,22 +341,7 @@ class Stagehand:
             "level": 1
         })
 
-        # Handle vision if enabled
-        annotated_screenshot = None
-        if use_vision is True:
-            if not model in MODELS_WITH_VISION:
-                self.log({
-                    "category": "action",
-                    "message": f"{model} does not support vision. Skipping vision processing.",
-                    "level": 1
-                })
-            else:
-                screenshot_service = ScreenshotService(
-                    self.driver,
-                    selector_map,
-                    self.verbose
-                )
-                annotated_screenshot = screenshot_service.get_annotated_screenshot(False)
+        annotated_screenshot = self._get_vision_screenshot(use_vision, model, selector_map)
 
         response = act(
             action, 
@@ -646,9 +660,12 @@ class Stagehand:
         progress: str = "",
         content: Union[Dict, List] = None,
         chunks_seen: List[int] = None,
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
+        use_vision: Optional[bool] = False
     ) -> Dict[str, Any]:
         """Internal method to handle extraction across chunks."""
+        model = model_name or self.default_model_name
+
         content = content or {}
         chunks_seen = chunks_seen or []
         
@@ -665,7 +682,9 @@ class Stagehand:
             "return window.processDom(arguments[0])",
             chunks_seen
         )
+
         output_string = result["outputString"]
+        selector_map = result["selectorMap"]
         chunk = result["chunk"]
         chunks = result["chunks"]
         
@@ -674,6 +693,8 @@ class Stagehand:
             "message": f"received output from processDom. Current chunk index: {chunk}, Number of chunks left: {len(chunks) - len(chunks_seen)}",
             "level": 1
         })
+
+        annotated_screenshot = self._get_vision_screenshot(use_vision, model, selector_map)
 
         extraction_response = extract(
             instruction,
@@ -684,7 +705,8 @@ class Stagehand:
             self.llm_provider,
             model_name or self.default_model_name,
             len(chunks_seen),
-            len(chunks)
+            len(chunks),
+            screenshot=annotated_screenshot
         )
 
         metadata = extraction_response.pop("metadata", {})
@@ -734,13 +756,15 @@ class Stagehand:
         self,
         instruction: str,
         schema: Any,
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
+        use_vision: Optional[bool] = False
     ) -> Dict[str, Any]:
         """Extract structured data from the current page."""
         return self._extract(
             instruction=instruction,
             schema=schema,
-            model_name=model_name
+            model_name=model_name,
+            use_vision=use_vision
         )
 
     def observe(
